@@ -1,4 +1,3 @@
-// routes/index.js
 const express = require("express");
 const authRoutes = require("./auth"); // Ganti dengan require
 const ipfsRoutes = require("./ipfsRoutes"); // Ganti dengan require
@@ -15,5 +14,4 @@ router.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// Menggunakan module.exports agar sesuai dengan CommonJS
-module.exports = router; // Ganti dengan module.exports
+module.exports = router;

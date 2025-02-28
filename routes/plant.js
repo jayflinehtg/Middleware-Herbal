@@ -1,11 +1,14 @@
 const express = require("express");
-const { body } = require("express-validator");
-const plantController = require("../controllers/plantController"); // Pastikan sudah mengimpor dengan benar
-const { onlyRegisteredUser } = require("../controllers/authController"); // Pastikan ini ada dan diimpor dengan benar
-
+const { body, validationResult } = require("express-validator");
+const {
+  addPlantData,
+  ratePlant,
+  likePlant,
+  submitTestimonial,
+} = require("../controllers/plantController"); // Make sure to require controllers correctly
 const router = express.Router();
 
-// Menambahkan rute
+// Route for adding plant data
 router.post(
   "/addPlantData",
   [
@@ -13,31 +16,124 @@ router.post(
     body("description").notEmpty().withMessage("Deskripsi harus diisi"),
     body("ipfsHash").notEmpty().withMessage("Hash IPFS harus diisi"),
   ],
-  onlyRegisteredUser, // Menambahkan middleware yang memeriksa apakah user terdaftar
-  (req, res, next) => {
+  async (req, res) => {
     console.log("Route POST /addPlantData dipanggil di plant.js");
-    plantController.addPlantData(req, res, next); // Memanggil controller yang sesuai
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    try {
+      const { plantName, description, ipfsHash } = req.body;
+      const txHash = await addPlantData(req, res);
+      res.json({
+        success: true,
+        message: "Tanaman berhasil ditambahkan!",
+        txHash: txHash,
+      });
+    } catch (error) {
+      console.error("Error in /addPlantData:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to add plant data",
+        error: error.message,
+      });
+    }
   }
 );
 
-router.get("/getPlantData/:id", (req, res, next) => {
-  console.log("Route GET /getPlantData/:id dipanggil di plant.js");
-  plantController.getPlantData(req, res, next); // Menambahkan data tanaman berdasarkan ID
-});
+// Route for rating a plant
+router.post(
+  "/ratePlant",
+  [
+    body("plantId").isInt().withMessage("Plant ID harus berupa angka"),
+    body("rating")
+      .isInt({ min: 1, max: 5 })
+      .withMessage("Rating harus antara 1 dan 5"),
+  ],
+  async (req, res) => {
+    console.log("Route POST /ratePlant dipanggil di plant.js");
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    try {
+      const { plantId, rating } = req.body;
+      const txHash = await ratePlant(req, res);
+      res.json({
+        success: true,
+        message: "Rating berhasil diberikan",
+        txHash: txHash,
+      });
+    } catch (error) {
+      console.error("Error in /ratePlant:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to rate plant",
+        error: error.message,
+      });
+    }
+  }
+);
 
-router.post("/ratePlant", onlyRegisteredUser, (req, res, next) => {
-  console.log("Route POST /ratePlant dipanggil di plant.js");
-  plantController.ratePlant(req, res, next); // Memberikan rating pada tanaman
-});
+// Route for liking a plant
+router.post(
+  "/likePlant",
+  [body("plantId").isInt().withMessage("Plant ID harus berupa angka")],
+  async (req, res) => {
+    console.log("Route POST /likePlant dipanggil di plant.js");
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    try {
+      const { plantId } = req.body;
+      const txHash = await likePlant(req, res);
+      res.json({
+        success: true,
+        message: "Like berhasil diberikan",
+        txHash: txHash,
+      });
+    } catch (error) {
+      console.error("Error in /likePlant:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to like plant",
+        error: error.message,
+      });
+    }
+  }
+);
 
-router.post("/likePlant", onlyRegisteredUser, (req, res, next) => {
-  console.log("Route POST /likePlant dipanggil di plant.js");
-  plantController.likePlant(req, res, next); // Memberikan like pada tanaman
-});
-
-router.post("/submitTestimonial", onlyRegisteredUser, (req, res, next) => {
-  console.log("Route POST /submitTestimonial dipanggil di plant.js");
-  plantController.submitTestimonial(req, res, next); // Menambahkan testimoni pada tanaman
-});
+// Route for submitting a testimonial for a plant
+router.post(
+  "/submitTestimonial",
+  [
+    body("plantId").isInt().withMessage("Plant ID harus berupa angka"),
+    body("testimonial").notEmpty().withMessage("Testimonial harus diisi"),
+  ],
+  async (req, res) => {
+    console.log("Route POST /submitTestimonial dipanggil di plant.js");
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    try {
+      const { plantId, testimonial } = req.body;
+      const txHash = await submitTestimonial(req, res);
+      res.json({
+        success: true,
+        message: "Testimonial berhasil diberikan",
+        txHash: txHash,
+      });
+    } catch (error) {
+      console.error("Error in /submitTestimonial:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to submit testimonial",
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

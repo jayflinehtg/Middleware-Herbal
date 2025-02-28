@@ -1,4 +1,3 @@
-// routes/ipfsRoutes.js
 const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
@@ -17,10 +16,10 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     fs.unlinkSync(filePath);
   } catch (err) {
-    console.error("Upload error:", err); // Log error yang lebih detail (termasuk stack trace)
+    console.error("Upload error:", err);
     res
       .status(500)
-      .json({ message: "Failed to upload file", error: err.message }); // Kirim pesan error yang lebih informatif
+      .json({ message: "Failed to upload file", error: err.message });
   }
 });
 
@@ -37,5 +36,4 @@ router.get("/file/:cid", async (req, res) => {
   }
 });
 
-// Menggunakan module.exports untuk ekspor router
-module.exports = router; // Ganti dengan module.exports
+module.exports = router;

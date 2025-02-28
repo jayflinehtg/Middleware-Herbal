@@ -24,15 +24,14 @@ contract HerbalPlant {
         string fullName;
         string email;
         address publicKey;
-        bytes32 passwordHash;
-        bytes32 salt;
+        string passwordHash; // Menyimpan password hash dalam format string
         bool isRegistered;
         bool isLoggedIn;
     }
 
     // Mappings untuk menyimpan data tanaman dan pengguna
     mapping(uint => Plant) public plants;
-    mapping(string => User) private usersByEmail; // Simpan user berdasarkan email
+    mapping(address => User) private usersByPublicKey; // Simpan user berdasarkan publicKey
     mapping(string => bool) public emailExists;
     uint public plantCount;
 
@@ -45,9 +44,9 @@ contract HerbalPlant {
     event PlantLiked(uint plantId, address user);
 
     // Modifiers untuk membatasi akses fungsi
-    modifier onlyRegisteredUser(string memory email) {
-        require(usersByEmail[email].isRegistered, "Anda harus terdaftar untuk melakukan ini");
-        require(usersByEmail[email].isLoggedIn, "Anda harus login untuk melakukan ini");
+    modifier onlyRegisteredUser(address publicKey) {
+        require(usersByPublicKey[publicKey].isRegistered, "Anda harus terdaftar untuk melakukan ini");
+        require(usersByPublicKey[publicKey].isLoggedIn, "Anda harus login untuk melakukan ini");
         _;
     }
 
@@ -56,24 +55,16 @@ contract HerbalPlant {
         _;
     }
 
-    // Fungsi untuk menghasilkan salt secara acak
-    function generateSalt() private view returns (bytes32) {
-        return keccak256(abi.encodePacked(block.timestamp, msg.sender));
-    }
-
-    // Fungsi-fungsi untuk manajemen pengguna
-    function registerUser(string memory fullName, string memory email, string memory password) public {
+    // Fungsi untuk manajemen pengguna
+    function registerUser(string memory fullName, string memory email, string memory passwordHash) public {
         require(!emailExists[email], "Email sudah terdaftar");
+        require(usersByPublicKey[msg.sender].publicKey == address(0), "Public key sudah terdaftar");
 
-        bytes32 salt = generateSalt();
-        bytes32 hashedPassword = keccak256(abi.encodePacked(password, salt));
-
-        usersByEmail[email] = User({
+        usersByPublicKey[msg.sender] = User({
             fullName: fullName,
             email: email,
             publicKey: msg.sender,
-            passwordHash: hashedPassword,
-            salt: salt,
+            passwordHash: passwordHash,
             isRegistered: true,
             isLoggedIn: false
         });
@@ -82,27 +73,26 @@ contract HerbalPlant {
         emit UserRegistered(msg.sender, fullName);
     }
 
-    function loginWithEmail(string memory email, string memory password) public {
-        require(usersByEmail[email].isRegistered, "Pengguna belum terdaftar");
-        require(usersByEmail[email].publicKey == msg.sender, "Alamat tidak cocok dengan email");
-        bytes32 salt = usersByEmail[email].salt;
-        bytes32 hashedPassword = keccak256(abi.encodePacked(password, salt));
-
-        require(usersByEmail[email].passwordHash == hashedPassword, "Password salah");
-        require(!usersByEmail[email].isLoggedIn, "Anda sudah login");
+    // Fungsi login dengan publicKey dan passwordHash
+    function loginWithPublicKey(address publicKey, string memory passwordHash) public {
+        require(usersByPublicKey[publicKey].isRegistered, "Pengguna belum terdaftar");
         
-        usersByEmail[email].isLoggedIn = true;
-        emit UserLoggedIn(msg.sender);
+        // Verifikasi password hash yang dikirimkan dari middleware
+        require(keccak256(abi.encodePacked(passwordHash)) == keccak256(abi.encodePacked(usersByPublicKey[publicKey].passwordHash)), "Password salah");
+        require(!usersByPublicKey[publicKey].isLoggedIn, "Anda sudah login");
+
+        usersByPublicKey[publicKey].isLoggedIn = true;
+        emit UserLoggedIn(publicKey);
     }
 
-    function logout(string memory email) public {
-        require(usersByEmail[email].isLoggedIn, "Anda belum login");
-        usersByEmail[email].isLoggedIn = false;
-        emit UserLoggedOut(msg.sender);
+    function logout(address publicKey) public {
+        require(usersByPublicKey[publicKey].isLoggedIn, "Anda belum login");
+        usersByPublicKey[publicKey].isLoggedIn = false;
+        emit UserLoggedOut(publicKey);
     }
 
     // Fungsi-fungsi untuk manajemen tanaman
-    function addPlant(string memory email, string memory name, string memory namaLatin, string memory komposisi, string memory kegunaan, string memory caraPengolahan, string memory ipfsHash) public onlyRegisteredUser(email) {
+    function addPlant(address publicKey, string memory name, string memory namaLatin, string memory komposisi, string memory kegunaan, string memory caraPengolahan, string memory ipfsHash) public onlyRegisteredUser(publicKey) {
         uint plantId = plantCount;
         Plant storage plant = plants[plantId];
         plant.name = name;
@@ -120,7 +110,7 @@ contract HerbalPlant {
         emit PlantAdded(plantId, name, namaLatin, komposisi, kegunaan, caraPengolahan, ipfsHash, msg.sender);
     }
 
-    function ratePlant(string memory email, uint plantId, uint rating) public onlyRegisteredUser(email) {
+    function ratePlant(address publicKey, uint plantId, uint rating) public onlyRegisteredUser(publicKey) {
         require(rating >= 1 && rating <= 5, "Rating harus antara 1 dan 5");
         require(bytes(plants[plantId].name).length > 0, "Tanaman tidak ditemukan");
 
@@ -137,7 +127,7 @@ contract HerbalPlant {
         emit PlantRated(plantId, msg.sender, rating);
     }
 
-    function likePlant(string memory email, uint plantId) public onlyRegisteredUser(email) {
+    function likePlant(address publicKey, uint plantId) public onlyRegisteredUser(publicKey) {
         Plant storage plant = plants[plantId];
 
         if (plant.liked[msg.sender]) {
@@ -194,7 +184,7 @@ contract HerbalPlant {
     }
 
     // Getter function for user data
-    function getUserByEmail(string memory email) public view returns (User memory) {
-        return usersByEmail[email];
+    function getUserByPublicKey(address publicKey) public view returns (User memory) {
+        return usersByPublicKey[publicKey];
     }
 }
